@@ -89,7 +89,7 @@ public class Program
 }
 
 public record PingRequest(string Message);
-public record PingResponse(string Reply, DateTime Timestamp);
+public record PingResponse(string response, DateTime Timestamp);
 ```
 
 - [ ] **Step 3: Verify Backend Build**
@@ -107,10 +107,17 @@ Expected: Build succeeded.
 - [ ] **Step 1: Define API states and response types**
 
 ```typescript
-export type ApiStatus = 'IDLE' | 'PENDING' | 'SUCCESS' | 'ERROR';
+export const API_STATUS = {
+  IDLE: 'IDLE',
+  PENDING: 'PENDING',
+  SUCCESS: 'SUCCESS',
+  ERROR: 'ERROR',
+} as const;
+
+export type ApiStatus = (typeof API_STATUS)[keyof typeof API_STATUS];
 
 export interface ApiResponse {
-  reply: string;
+  response: string;
   timestamp: string;
 }
 
@@ -132,14 +139,14 @@ export interface ApiState<T> {
 
 ```typescript
 import { useState, useCallback, useRef, useEffect } from 'react';
-import { ApiStatus, ApiState } from '../types/api';
+import { API_STATUS, ApiStatus, ApiState } from '../types/api';
 
-const DEFAULT_TIMEOUT = 10000;
+const DEFAULT_TIMEOUT_MS = 10000;
 
 export function useApi<TRequest, TResponse>(url: string) {
   const [state, setState] = useState<ApiState<TResponse>>({
     data: null,
-    status: 'IDLE',
+    status: API_STATUS.IDLE,
     error: null,
   });
 
@@ -163,13 +170,13 @@ export function useApi<TRequest, TResponse>(url: string) {
     const controller = new AbortController();
     abortControllerRef.current = controller;
 
-    setState({ data: null, status: 'PENDING', error: null });
+    setState({ data: null, status: API_STATUS.PENDING, error: null });
 
-    let didTimeout = false;
+    let timeout = false;
     const timeoutId = setTimeout(() => {
-      didTimeout = true;
+      timeout = true;
       controller.abort();
-    }, DEFAULT_TIMEOUT);
+    }, DEFAULT_TIMEOUT_MS);
 
     try {
       const response = await fetch(url, {
@@ -184,14 +191,14 @@ export function useApi<TRequest, TResponse>(url: string) {
       }
 
       const data = await response.json() as TResponse;
-      setState({ data, status: 'SUCCESS', error: null });
+      setState({ data, status: API_STATUS.SUCCESS, error: null });
     } catch (err: any) {
       if (err.name === 'AbortError') {
         // Only update state if it was a timeout; otherwise (unmount) stay silent
-        if (didTimeout) {
+        if (timeout) {
           setState({
             data: null,
-            status: 'ERROR',
+            status: API_STATUS.ERROR,
             error: 'Request Timed Out',
           });
         }
@@ -199,7 +206,7 @@ export function useApi<TRequest, TResponse>(url: string) {
       }
       setState({
         data: null,
-        status: 'ERROR',
+        status: API_STATUS.ERROR,
         error: err.message || 'Unknown Network Error',
       });
     } finally {
@@ -227,7 +234,7 @@ export function useApi<TRequest, TResponse>(url: string) {
 ```tsx
 import { useState } from 'react';
 import { useApi } from '../hooks/useApi';
-import { ApiResponse } from '../types/api';
+import { API_STATUS, ApiResponse } from '../types/api';
 
 export function ConnectivityDemo() {
   const [message, setMessage] = useState('');
@@ -239,6 +246,8 @@ export function ConnectivityDemo() {
     }
   };
 
+  const isPending = status === API_STATUS.PENDING;
+
   return (
     <div style={{ padding: '20px', border: '1px solid #ccc', borderRadius: '8px', maxWidth: '400px' }}>
       <h2>API Connectivity Test</h2>
@@ -247,21 +256,21 @@ export function ConnectivityDemo() {
         value={message}
         onChange={(e) => setMessage(e.target.value)}
         placeholder="Type a message..."
-        disabled={status === 'PENDING'}
+        disabled={isPending}
       />
-      <button onClick={handleSend} disabled={status === 'PENDING' || !message.trim()}>
-        {status === 'PENDING' ? 'Processing...' : 'Send to Backend'}
+      <button onClick={handleSend} disabled={isPending || !message.trim()}>
+        {isPending ? 'Processing...' : 'Send to Backend'}
       </button>
 
       <div style={{ marginTop: '20px' }}>
         <strong>Status:</strong> {status}
-        {status === 'SUCCESS' && data && (
+        {status === API_STATUS.SUCCESS && data && (
           <div style={{ color: 'green', marginTop: '10px' }}>
-            <p><strong>Reply:</strong> {data.reply}</p>
+            <p><strong>response:</strong> {data.response}</p>
             <p><small>Timestamp: {new Date(data.timestamp).toLocaleString()}</small></p>
           </div>
         )}
-        {status === 'ERROR' && (
+        {status === API_STATUS.ERROR && (
           <div style={{ color: 'red', marginTop: '10px' }}>
             <p><strong>Error:</strong> {error}</p>
           </div>

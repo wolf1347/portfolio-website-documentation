@@ -14,7 +14,7 @@ Establish a clean, reusable pattern for the frontend to communicate with the bac
 - **Security:** Environment-aware CORS policy and request timeouts.
 
 ## 3. State Machine
-All API interactions will follow these standardized states:
+All API interactions will follow these standardized states (implemented as a `const` object):
 - `IDLE`: Initial state, ready for input.
 - `PENDING`: Request is in flight; UI shows processing.
 - `SUCCESS`: Request completed successfully; data available.
@@ -28,7 +28,7 @@ All API interactions will follow these standardized states:
     1. Log incoming message.
     2. **Jitter Simulation:** 
        `int jitterDelay = 1500 + Random.Shared.Next(0, 1000); await Task.Delay(jitterDelay);`
-    3. Return `200 OK` with `{ "reply": string, "timestamp": DateTime }`.
+    3. Return `200 OK` with `{ "response": string, "timestamp": DateTime }`.
 
 ### 4.2 Middleware & Configuration
 - **CORS Ordering:** 
